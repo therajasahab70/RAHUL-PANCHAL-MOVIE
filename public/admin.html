@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADMIN PANEL - RAHUL PANCHAL</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #141414; color: #fff; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .box { background: #222; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; }
+        input[type="text"], input[type="password"], input[type="file"] { display: block; background: #333; padding: 12px; border: 1px solid #444; border-radius: 4px; width: 100%; box-sizing: border-box; color: #fff; margin-bottom: 15px; }
+        button { background: #0071eb; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; }
+        .btn-delete { background: #e50914; margin-top: 10px; padding: 8px; font-size: 0.9rem; width: auto; display: inline-block; }
+        .movie-list-item { background: #1f1f1f; padding: 15px; margin-bottom: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        #adminDashboard { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Secret Admin Dashboard</h1>
+
+        <div id="loginBox" class="box">
+            <h3>प्रवेश करने के लिए पासवर्ड डालें</h3>
+            <input type="password" id="adminPass" placeholder="Enter Admin Password..." />
+            <button onclick="verifyLogin()">Login</button>
+        </div>
+
+        <div id="adminDashboard">
+            <div class="box">
+                <h3>Add a New Movie & Upload Theme</h3>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <input type="text" id="movieTitle" placeholder="मूवी का नाम..." required />
+                    <label>🎬 मूवी थीम / पोस्टर फोटो अपलोड करें:</label>
+                    <input type="file" id="posterFile" accept="image/*" />
+                    <input type="text" id="movieStreamUrl" placeholder="Google Drive Embed/Preview Link..." required />
+                    <input type="text" id="movieDownloadUrl" placeholder="Download Link (वैकल्पिक)..." />
+                    <button type="submit" id="uploadBtn">Publish Movie</button>
+                </form>
+            </div>
+
+            <h3>Manage / Delete Movies</h3>
+            <div id="adminMovieGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        let myPassword = "";
+
+        function verifyLogin() {
+            const passInput = document.getElementById('adminPass').value;
+            if(passInput === "RAHUL70@") { 
+                myPassword = passInput;
+                document.getElementById('loginBox').style.display = 'none';
+                document.getElementById('adminDashboard').style.display = 'block';
+                loadAdminMovies();
+            } else { alert("गलत पासवर्ड!"); }
+        }
+
+        async function loadAdminMovies() {
+            const res = await fetch('/api/movies');
+            const data = await res.json();
+            const grid = document.getElementById('adminMovieGrid');
+            grid.innerHTML = '';
+
+            if(!data.movies || data.movies.length === 0) {
+                grid.innerHTML = '<p>No movies online.</p>';
+                return;
+            }
+
+            data.movies.forEach(movie => {
+                const item = document.createElement('div');
+                item.className = 'movie-list-item';
+                item.innerHTML = `
+                    <div><strong>${movie.title}</strong></div>
+                    <button class="btn-delete" onclick="deleteMovie('${movie.id}')">❌ Delete</button>
+                `;
+                grid.appendChild(item);
+            });
+        }
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('title', document.getElementById('movieTitle').value);
+            formData.append('videoUrl', document.getElementById('movieStreamUrl').value);
+            formData.append('downloadUrl', document.getElementById('movieDownloadUrl').value);
+            formData.append('password', myPassword);
+            
+            const fileInput = document.getElementById('posterFile');
+            if(fileInput.files.length > 0) formData.append('posterFile', fileInput.files[0]);
+
+            const res = await fetch('/api/add-movie', { method: 'POST', body: formData });
+            if(res.status === 201) {
+                alert("मूवी लाइव हो गई!");
+                uploadForm.reset();
+                loadAdminMovies();
+            } else { alert("अपलोड फेल!"); }
+            btn.disabled = false;
+        });
+
+        async function deleteMovie(id) {
+            if(!confirm("क्या आप सच में यह मूवी डिलीट करना चाहते हैं?")) return;
+            
+            const res = await fetch('/api/delete-movie', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, password: myPassword })
+            });
+
+            if(res.ok) {
+                alert("मूवी डिलीट हो गई!");
+                loadAdminMovies();
+            } else { alert("डिलीट फेल!"); }
+        }
+    </script>
+</body>
+</html>
